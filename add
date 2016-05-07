@@ -312,7 +312,7 @@ class Program(object):
         self.write(pf, '</VirtualHost>')
 
     def https_vh_create(self, pf):
-        ip_port = self.config['http'].get('ip_port', '*:443')
+        ip_port = self.config['https'].get('ip_port', '*:443')
         self.write(pf, '<IfModule mod_ssl.c>')
         self.write(pf, '<VirtualHost %s>' % ip_port)
         self.vh_domains_write(pf)
