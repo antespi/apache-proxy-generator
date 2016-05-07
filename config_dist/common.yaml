@@ -1,0 +1,112 @@
+%YAML 1.2
+---
+# Apache2 path where save virtual host file
+available_path: '/etc/apache2/sites-available'
+
+# Apache2 path where save virtual host symlinks
+enabled_path: '/etc/apache2/sites-enabled'
+
+# Symlink link prefix
+symlink_path: '../sites-available'
+
+# Symlink prefix, this define Apache2 virtual hosts loading order
+# Less number loads first
+priority: '000'
+
+# Email for 'ServerAdmin' virtual host directive
+server_admin: '__YOUR_EMAIL__@__YOUR_DOMAIN__.com'
+
+# Main domain. 'subdomain.domain' will be the filename of this virtual host
+# and 'ServerName' virtual host directive
+domain: '__YOUR_DOMAIN__.com'
+subdomain: ''
+
+# 'ServerAlias' virtual host directive
+# alias_domains_redirect define redirect domains
+other_domains: []
+other_subdomains: []
+alias_domains_redirect: []
+
+# Rules for mod_rewrite
+custom_rewrite_rules: [
+    # ['Pattern', 'Substitution', 'flags'],
+    # ['/people/(.*)', 'https://linkedin.com/profile/$1', 'R=301,NE,L']
+]
+
+# Rules for basic HTTP auth
+basic_access_rules: [
+    # ['RegexPattern', 'PasswdFile', 'Name'],
+    # ['^/event', '/var/www/passwd/event.passwd', 'Event access']
+]
+
+# IP list allowed to access to Odoo Backend (/web) and XML-RPC (/xmlrpc/2)
+# Empty for allowing to everyone
+web_ips: []
+
+# IP list allowed to access to Odoo management
+# - /web/database/manager (manager_protect)
+# - /website/info (webinfo_protect)
+# Empty for allowing to everyone
+trust_ips: [
+    # '123.123.123.123',          # Just an IP address
+    # '123.123.123.0/24',         # A IP range
+    # '127.0.0.0/255.0.0.0',      # loopback
+    # '::1/128',                  # loopback ipv6
+]
+
+# Condition to check when user autheticates via client certificate
+trust_certificates: ''
+    # '%{SSL_CLIENT_S_DN_O} eq "__YOUR_ORG__" and ' +
+    # '%{SSL_CLIENT_S_DN_OU} in {"__YOUR_DEPART__"}'
+
+# Proxy params
+proxy:
+    machine: '__MACHINE__.__YOUR_DOMAIN__.com'
+    openerp_port: 8069
+    longpolling_port: False
+    nokeepalive: True
+
+# HTTP params
+http:
+    # Create HTTP(TCP/80) virtual host
+    enabled: True
+    # IP and port where listening this vitual host
+    ip_port: '*:80'
+    # Redirect all request to HTTPS inconditionally
+    redirect_to_https: True
+    # Enable HTTP proxy
+    proxy: False
+    # Redirect to main domain for all unknown domains
+    redirect_unknown_domains: True
+    # Protect access to /web/database/manager ('ip' or False)
+    manager_protect: False
+    # Protect access to /website/info ('ip' or False)
+    webinfo_protect: False
+
+# HTTPS params
+https:
+    # Create HTTPS(TCP/443) virtual host
+    enabled: True
+    # IP and port where listening this vitual host
+    ip_port: '*:443'
+    # Enable HTTPS proxy
+    proxy: True
+    # Redirect to main domain for all unknown domains
+    redirect_unknown_domains: True
+    # Protect access to /web/database/manager ('ip', 'certificate' or False)
+    manager_protect: 'certificate'
+    # Protect access to /website/info ('ip', 'certificate' or False)
+    webinfo_protect: 'certificate'
+
+# SSL params for these Apache2 directives:
+#   SSLCertificateFile <cert>
+#   SSLCertificateKeyFile <key>
+#   SSLCertificateChainFile <chain>
+#   SSLCACertificateFile <ca>
+#   SSLCARevocationFile <crl>
+ssl:
+    cert: '/path/to/domain_certificate.crt'
+    key: '/path/to/domain_private.key'
+    chain: '/path/to/bundle_certificate.crt'
+    ca: '/path/to/ca_certificate_for_client_auth.crt'
+    crl: '/path/to/crl_for_client_auth.crl'

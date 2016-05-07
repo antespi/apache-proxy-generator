@@ -1,0 +1,413 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+# © 2016 Antonio Espinosa - <antespi@gmail.com>
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+
+import os
+
+from lib import verbose
+from lib.cli import CliBase, dict_recursive_update
+
+
+class Program(object):
+    config = {}
+    config_default = {
+        'parent': False,
+        'available_path': '/etc/apache2/sites-available',
+        'enabled_path': '/etc/apache2/sites-enabled',
+        'symlink_path': '../sites-available',
+        'priority': '000',
+        'server_admin': '__YOUR_EMAIL__@__YOUR_DOMAIN__.com',
+        'domain': '__YOUR_DOMAIN__.com',
+        'subdomain': '',
+        'other_domains': [],
+        'other_subdomains': [],
+        'alias_domains_redirect': [],
+        'custom_rewrite_rules': [
+            # ['Pattern', 'Substitution', 'flags'],
+            # ['/people/(.*)', 'https://linkedin.com/profile/$1', 'R=301,NE,L']
+        ],
+        'basic_access_rules': [
+            # ['RegexPattern', 'PasswdFile', 'Name'],
+            # ['^/event', '/var/www/passwd/event.passwd', 'Event access']
+        ],
+        'web_ips': [],
+        'trust_ips': [
+            # '123.123.123.123',          # Just an IP address
+            # '123.123.123.0/24',         # A IP range
+            # '127.0.0.0/255.0.0.0',      # loopback
+            # '::1/128',                  # loopback ipv6
+        ],
+        'trust_certificates': '',
+        # '%{SSL_CLIENT_S_DN_O} eq "__YOUR_ORG__" and ' +
+        # '%{SSL_CLIENT_S_DN_OU} in {"__YOUR_DEPART__"}',
+        'proxy': {
+            'machine': '__MACHINE__.__YOUR_DOMAIN__.com',
+            'longpolling_port': False,  # 8072,
+            'openerp_port': 8069,
+            'nokeepalive': True,
+        },
+        'http': {
+            'enabled': True,
+            'redirect_to_https': True,
+            'proxy': False,
+            'redirect_unknown_domains': True,
+            'manager_protect': False,
+            'webinfo_protect': False,
+        },
+        'https': {
+            'enabled': True,
+            'proxy': True,
+            'redirect_unknown_domains': True,
+            'manager_protect': 'certificate',
+            'webinfo_protect': 'certificate',
+        },
+        'ssl': {
+            'cert': '/path/to/domain_certificate.crt',
+            'key': '/path/to/domain_private.key',
+            'chain': '/path/to/bundle_certificate.crt',
+            'ca': '/path/to/ca_certificate_for_client_auth.crt',
+            'crl': '/path/to/crl_for_client_auth.crl',
+        },
+    }
+
+    def __init__(self, args, options, config):
+        self.args = args
+        self.options = options
+        self.config = self.config_default.copy()
+        dict_recursive_update(self.config, config)
+
+    def _stringify(self, value):
+        if not value:
+            value = ''
+        if type(value) is unicode:
+            value = value.encode('utf-8')
+        if type(value) is float:
+            value = str(value).replace('.0', '')
+        if not type(value) is str:
+            value = str(value)
+        # Strip also NO-BREAK SPACEs
+        value = value.replace('\xc2\xa0', ' ')
+        return value
+
+    def write(self, pf, text, padding=0):
+        prefix = ''
+        if padding > 0:
+            prefix = '   ' * padding
+        text = self._stringify(text)
+        pf.write(prefix + text + '\n')
+
+    def vh_domains_write(self, pf):
+        server_admin = self.config['server_admin']
+
+        self.write(pf, 'ServerAdmin %s' % server_admin, 1)
+        self.write(pf, 'ServerName %s' % self.fqdn, 1)
+        self.write(pf, '')
+        if self.aliases or self.aliases_redirect:
+            line = ' '.join(['ServerAlias'] +
+                            self.aliases + self.aliases_redirect)
+            self.write(pf, '# Domains for other DDBB', 1)
+            self.write(pf, line, 1)
+            self.write(pf, '')
+
+    def vh_proxy_write(self, pf):
+        machine = self.config['proxy'].get('machine', 'localhost')
+        openerp_port = self.config['proxy'].get('openerp_port', 8069)
+        longpolling_port = self.config['proxy'].get('longpolling_port', False)
+        nokeepalive = self.config['proxy'].get('nokeepalive', True)
+
+        self.write(pf, '# Comment to disable proxy', 1)
+        self.write(pf, 'ProxyRequests Off', 1)
+        self.write(pf, 'ProxyPreserveHost On', 1)
+        if longpolling_port:
+            self.write(
+                pf, 'ProxyPass /longpolling/        ' +
+                'http://%s:%d/longpolling/ retry=0' %
+                (machine, longpolling_port), 1)
+            self.write(
+                pf, 'ProxyPassReverse /longpolling/ ' +
+                'http://%s:%d/longpolling/ retry=0' %
+                (machine, longpolling_port), 1)
+        self.write(
+            pf, 'ProxyPass /                    ' +
+            'http://%s:%d/ retry=0' %
+            (machine, openerp_port), 1)
+        self.write(
+            pf, 'ProxyPassReverse /             ' +
+            'http://%s:%d/ retry=0' %
+            (machine, openerp_port), 1)
+        if nokeepalive:
+            self.write(pf, 'SetEnv force-proxy-request-1.0 1', 1)
+            self.write(pf, 'SetEnv proxy-nokeepalive 1', 1)
+        self.write(pf, '')
+
+    def vh_browse_write(self, pf, scheme='http'):
+        if scheme == 'https':
+            self.write(pf, '# SSL Protocol adjustments for MSIE', 1)
+            self.write(
+                pf, 'BrowserMatch "MSIE [2-6]" nokeepalive '
+                'ssl-unclean-shutdown downgrade-1.0 force-response-1.0', 1)
+            self.write(
+                pf, 'BrowserMatch "MSIE [17-9]" ssl-unclean-shutdown', 1)
+            self.write(pf, '')
+
+    def vh_logs_write(self, pf, suffix=''):
+        domain = self.config['domain']
+        subdomain = self.config['subdomain']
+        if subdomain:
+            log_name = subdomain + '.' + domain + suffix
+        else:
+            log_name = domain + suffix
+
+        self.write(pf, 'ErrorLog ' +
+                   '/var/log/apache2/%s.error.log' % log_name, 1)
+        self.write(pf, 'LogLevel warn', 1)
+        self.write(pf, 'CustomLog ' +
+                   '/var/log/apache2/%s.access.log combined' % log_name, 1)
+        self.write(pf, '')
+
+    def vh_http_redirect_to_https_write(self, pf):
+        self.write(pf, '# Comment to disable redirect to HTTPS', 1)
+        self.write(pf, '<IfModule mod_rewrite.c>', 1)
+        self.write(pf, 'RewriteCond %{HTTPS} !=on', 2)
+        self.write(pf, 'RewriteRule ^/?(.*) ' +
+                   'https://%{SERVER_NAME}/$1 [R=301,NE,L]', 2)
+        self.write(pf, '</IfModule>', 1)
+        self.write(pf, '')
+
+    def vh_custom_rewrite_rules_write(self, pf):
+        rules = self.config.get('custom_rewrite_rules', False)
+        if rules:
+            self.write(pf, '# Custom rewrite rules', 1)
+            self.write(pf, '<IfModule mod_rewrite.c>', 1)
+            for rule in rules:
+                statement = ''
+                if type(rule) in (tuple, list):
+                    if len(rule) >= 2:
+                        statement = 'RewriteRule %s %s' % (rule[0], rule[1])
+                    if len(rule) == 3:
+                        statement += ' [%s]' % rule[2]
+                if statement:
+                    self.write(pf, statement, 2)
+            self.write(pf, '</IfModule>', 1)
+            self.write(pf, '')
+
+    def vh_redirect_unknown_domains_write(self, pf, schema='http'):
+        self.write(pf, '# Permanent redirect (301 HTTP) ' +
+                   'if no canonical domain name', 1)
+        self.write(pf, '<IfModule mod_rewrite.c>', 1)
+        self.write(pf, 'RewriteCond %{HTTP_HOST} ' +
+                   '!^%s' % self.fqdn, 2)
+        if self.aliases:
+            for alias in self.aliases:
+                self.write(pf, 'RewriteCond %{HTTP_HOST} ' +
+                           '!^%s' % alias, 2)
+        self.write(pf, 'RewriteRule ^/(.*)$ %s://%s/$1 [R=301,NE,L]' %
+                   (schema, self.fqdn), 2)
+        self.write(pf, '</IfModule>', 1)
+        self.write(pf, '')
+
+    def vh_location_write(self, pf, uri, ips, tag='Location'):
+        self.write(pf, '<%s "%s" >' % (tag, uri), 1)
+        self.write(pf, 'Order deny,allow', 2)
+        self.write(pf, 'Deny from all', 2)
+        self.write(pf, 'Allow from %s' % ips, 2)
+        self.write(pf, '</%s>' % tag, 1)
+        self.write(pf, '')
+
+    def vh_ssl_protect_write(self, pf, uri, certs, tag='Location'):
+        self.write(pf, '<%s "%s" >' % (tag, uri), 1)
+        self.write(pf, 'SSLVerifyClient require', 2)
+        self.write(pf, 'SSLVerifyDepth 10', 2)
+        self.write(pf, 'SSLRequireSSL', 2)
+        if certs:
+            self.write(pf, 'SSLRequire %s' % certs, 2)
+        self.write(pf, '</%s>' % tag, 1)
+        self.write(pf, '')
+
+    def vh_basic_access_write(self, pf, uri, passwd, name,
+                              tag='LocationMatch'):
+        self.write(pf, '<%s "%s" >' % (tag, uri), 1)
+        self.write(pf, 'AuthUserFile "%s"' % passwd, 2)
+        self.write(pf, 'AuthName "%s"' % name, 2)
+        self.write(pf, 'AuthType Basic', 2)
+        self.write(pf, 'require valid-user', 2)
+        self.write(pf, '</%s>' % tag, 1)
+        self.write(pf, '')
+
+    def vh_protect_write(self, pf, schema='http'):
+        ips = ' '.join(self.config['trust_ips'])
+        certs = self.config['trust_certificates']
+        self.vh_location_write(pf, '/', 'all')
+        mp = self.config[schema]['manager_protect']
+        wp = self.config[schema]['webinfo_protect']
+        if mp == 'ip' or mp is True:
+            self.vh_location_write(pf, '/web/database/manager', ips)
+        if wp == 'ip' or wp is True:
+            self.vh_location_write(pf, '/website/info', ips)
+        if schema == 'https':
+            if mp == 'certificate':
+                self.vh_ssl_protect_write(pf, '/web/database/manager', certs)
+            if wp == 'certificate':
+                self.vh_ssl_protect_write(pf, '/website/info', certs)
+        if self.config.get('web_ips', False):
+            web_ips = ' '.join(self.config['web_ips'])
+            self.vh_location_write(
+                pf, '^/web(?!/css)(?!/js)(?!/static)([/\?#].*)?$',
+                web_ips, 'LocationMatch')
+            self.vh_location_write(pf, '^/xmlrpc/2/(common|object)',
+                                   web_ips, 'LocationMatch')
+        for rule in self.config.get('basic_access_rules', []):
+            self.vh_basic_access_write(pf, rule[0], rule[1], rule[2])
+
+    def vh_ssl_write(self, pf):
+        key = self.config['ssl']['key']
+        cert = self.config['ssl']['cert']
+        chain = self.config['ssl']['chain']
+        ca = self.config['ssl']['ca']
+        crl = self.config['ssl']['crl']
+
+        self.write(pf, '# SSL certificate', 1)
+        self.write(pf, 'SSLProxyEngine on', 1)
+        self.write(pf, 'SSLEngine on', 1)
+        self.write(pf, 'SSLProtocol all -SSLv2 -SSLv3', 1)
+        self.write(pf, 'SSLCipherSuite ' +
+                   'ALL:!ADH:!EXPORT:!SSLv2:RC4+RSA:+HIGH:+MEDIUM', 1)
+        self.write(pf, 'SSLCertificateFile %s' % cert, 1)
+        self.write(pf, 'SSLCertificateKeyFile %s' % key, 1)
+        if chain:
+            self.write(pf, 'SSLCertificateChainFile %s' % chain, 1)
+        if ca:
+            self.write(pf, '')
+            self.write(pf, 'SSLVerifyClient none', 1)
+            self.write(pf, 'SSLCACertificateFile %s' % ca, 1)
+        if crl:
+            self.write(pf, 'SSLCARevocationCheck chain', 1)
+            self.write(pf, 'SSLCARevocationFile %s' % crl, 1)
+        self.write(pf, '')
+        self.write(pf, 'RequestHeader set X-Forwarded-Proto "https"', 1)
+        self.write(pf, '')
+
+    def vh_rewrite_engine_enable(self, pf):
+        self.write(pf, '<IfModule mod_rewrite.c>', 1)
+        self.write(pf, 'RewriteEngine On', 2)
+        self.write(pf, '</IfModule>', 1)
+        self.write(pf, '')
+
+    def http_vh_create(self, pf):
+        ip_port = self.config['http'].get('ip_port', '*:80')
+        self.write(pf, '<VirtualHost %s>' % ip_port)
+        self.vh_domains_write(pf)
+        self.vh_rewrite_engine_enable(pf)
+        self.vh_custom_rewrite_rules_write(pf)
+        if self.config['http']['redirect_unknown_domains']:
+            self.vh_redirect_unknown_domains_write(pf, 'http')
+        if self.config['http']['redirect_to_https']:
+            self.vh_http_redirect_to_https_write(pf)
+        self.vh_protect_write(pf, 'http')
+        if self.config['http']['proxy']:
+            self.vh_proxy_write(pf)
+        self.vh_browse_write(pf, 'http')
+        self.vh_logs_write(pf)
+        self.write(pf, '</VirtualHost>')
+
+    def https_vh_create(self, pf):
+        ip_port = self.config['http'].get('ip_port', '*:443')
+        self.write(pf, '<IfModule mod_ssl.c>')
+        self.write(pf, '<VirtualHost %s>' % ip_port)
+        self.vh_domains_write(pf)
+        self.vh_ssl_write(pf)
+        self.vh_rewrite_engine_enable(pf)
+        self.vh_custom_rewrite_rules_write(pf)
+        if self.config['https']['redirect_unknown_domains']:
+            self.vh_redirect_unknown_domains_write(pf, 'https')
+        self.vh_protect_write(pf, 'https')
+        if self.config['https']['proxy']:
+            self.vh_proxy_write(pf)
+        self.vh_browse_write(pf, 'https')
+        self.vh_logs_write(pf, '-ssl')
+        self.write(pf, '</VirtualHost>')
+        self.write(pf, '</IfModule>')
+
+    def vh_enable(self, filename):
+        symlink_path = self.config['symlink_path']
+        enabled_path = self.config['enabled_path']
+        priority = self.config['priority']
+        source = os.path.join(symlink_path, filename)
+        link = os.path.join(enabled_path, priority + '-' + filename)
+        if os.path.exists(link):
+            os.unlink(link)
+        os.symlink(source, link)
+
+    def run(self):
+        domain = self.config['domain']
+        subdomain = self.config['subdomain']
+        other_domains = self.config['other_domains']
+        alias_domains = self.config['alias_domains_redirect']
+        other_subdomains = self.config['other_subdomains']
+
+        if subdomain:
+            self.fqdn = subdomain + '.' + domain
+        elif domain:
+            self.fqdn = domain
+        else:
+            raise Exception('No subdomain or domain defined')
+        self.aliases = []
+        if not type(other_domains) is list:
+            self.aliases.append(other_domains)
+        elif other_domains:
+            self.aliases += other_domains
+
+        self.aliases_redirect = []
+        if not type(alias_domains) is list:
+            self.aliases_redirect.append(alias_domains)
+        elif alias_domains:
+            self.aliases_redirect += alias_domains
+
+        if other_subdomains:
+            if not type(other_subdomains) is list:
+                other_subdomains = [other_subdomains]
+            for sub in other_subdomains:
+                self.aliases.append(sub + '.' + domain)
+
+        # Create HTTP virtual host
+        if self.config['http']['enabled']:
+            filename = self.fqdn + '.conf'
+            filepath = os.path.join(self.config['available_path'], filename)
+            verbose.show(verbose.INFO,
+                         'HTTP virtual host : %s' % filename)
+            with open(filepath, 'wb') as pf:
+                verbose.show(verbose.INFO, 'Creating', 1)
+                self.http_vh_create(pf)
+            verbose.show(verbose.INFO, 'Enabling', 1)
+            self.vh_enable(filename)
+
+        # Create HTTPS virtual host
+        if self.config['https']['enabled']:
+            filename = self.fqdn + '-ssl.conf'
+            filepath = os.path.join(self.config['available_path'], filename)
+            verbose.show(verbose.INFO,
+                         'HTTPS virtual host : %s' % filename)
+            with open(filepath, 'wb') as pf:
+                verbose.show(verbose.INFO, 'Creating', 1)
+                self.https_vh_create(pf)
+            verbose.show(verbose.INFO, 'Enabling', 1)
+            self.vh_enable(filename)
+
+
+class CustomCli(CliBase):
+    def config_parse(self):
+        if not self.options.config:
+            msg = "ERROR : Please define a config file"
+            self.usage(msg, errno=1)
+        return super(CustomCli, self).config_parse()
+
+
+def main():
+    cli = CustomCli('virtual_host_add', '1.0')
+    program = Program(cli.args, cli.options, cli.config)
+
+    cli.run(program, verbose.INFO)
+
+if __name__ == '__main__':
+    main()

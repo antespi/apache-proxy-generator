@@ -1,0 +1,8 @@
+%YAML 1.2
+---
+parent: '../common.yaml'
+priority: '001'
+subdomain: 'service-one'
+other_subdomains: ['service-one-alt']
+proxy:
+    machine: 'localhost'

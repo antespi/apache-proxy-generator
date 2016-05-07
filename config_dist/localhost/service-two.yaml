@@ -1,0 +1,10 @@
+%YAML 1.2
+---
+parent: '../common.yaml'
+priority: '002'
+domain: 'service-two.alt_domain.com'
+alias_domains_redirect: [
+    'alt_domain.com',
+]
+proxy:
+    machine: 'localhost'

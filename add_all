@@ -1,0 +1,59 @@
+#!/bin/bash
+# -*- coding: utf-8 -*-
+# © 2016 Antonio Espinosa - <antespi@gmail.com>
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+
+DEBUG=0
+PARAMS=1
+
+FIND=/usr/bin/find
+LN=/bin/ln
+GREP=/bin/grep
+READLINK=/bin/readlink
+DIRNAME=/usr/bin/dirname
+
+if [ ! $# -ge $PARAMS ]; then
+    echo "Usage: $0 <servers>"
+    exit 1;
+fi
+
+root_path() {
+    SOURCE="${BASH_SOURCE[0]}"
+    DIR="$( dirname "$SOURCE" )"
+    while [ -h "$SOURCE" ]
+    do
+        SOURCE="$( readlink "$SOURCE" )"
+        [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+        DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd )"
+    done
+    DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
+    echo "$DIR"
+}
+
+ROOT_PATH=`root_path`
+ADD="$ROOT_PATH/add.py"
+CONFIG_PATH="$ROOT_PATH/config"
+
+for i in $@; do
+    SERVER_PATH="$i"
+
+    if [ ! -d "$SERVER_PATH" ]; then
+        continue
+    fi
+
+    SERVER_PATH=`$READLINK -m $SERVER_PATH`
+    cd $CONFIG_PATH
+    services=`$FIND "$SERVER_PATH" -maxdepth 1 -mindepth 1 -type f -name "*.yaml"`
+
+    for s in $services ; do
+        echo -n "Configuring '$s' ... "
+        $ADD -c "$s"
+        error=$?
+        if [ $error -eq 0 ]; then
+            echo 'OK'
+        else
+            echo "ERROR: $error"
+        fi
+    done
+done
