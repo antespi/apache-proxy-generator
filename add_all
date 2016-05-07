@@ -32,17 +32,17 @@ root_path() {
 }
 
 ROOT_PATH=`root_path`
-ADD="$ROOT_PATH/add.py"
+ADD="$ROOT_PATH/add"
 CONFIG_PATH="$ROOT_PATH/config"
 
 for i in $@; do
     SERVER_PATH="$i"
 
-    if [ ! -d "$SERVER_PATH" ]; then
+    if [ ! -d "$CONFIG_PATH/$SERVER_PATH" ]; then
         continue
     fi
 
-    SERVER_PATH=`$READLINK -m $SERVER_PATH`
+    SERVER_PATH=`$READLINK -m "$CONFIG_PATH/$SERVER_PATH"`
     cd $CONFIG_PATH
     services=`$FIND "$SERVER_PATH" -maxdepth 1 -mindepth 1 -type f -name "*.yaml"`
 
