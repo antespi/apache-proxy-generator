@@ -211,7 +211,7 @@ class Program(object):
         self.write(pf, '<%s "%s" >' % (tag, uri), 1)
         self.write(pf, 'Order deny,allow', 2)
         self.write(pf, 'Deny from all', 2)
-        self.write(pf, 'Allow from %s' % ips, 2)
+        self.write(pf, 'Allow from %s' % ips or 'all', 2)
         self.write(pf, '</%s>' % tag, 1)
         self.write(pf, '')
 
@@ -241,9 +241,9 @@ class Program(object):
         self.vh_location_write(pf, '/', 'all')
         mp = self.config[schema]['manager_protect']
         wp = self.config[schema]['webinfo_protect']
-        if mp == 'ip' or mp is True:
+        if (mp == 'ip' or mp is True) and ips:
             self.vh_location_write(pf, '/web/database/manager', ips)
-        if wp == 'ip' or wp is True:
+        if (wp == 'ip' or wp is True) and ips:
             self.vh_location_write(pf, '/website/info', ips)
         if schema == 'https':
             if mp == 'certificate':
