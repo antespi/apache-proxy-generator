@@ -118,12 +118,12 @@ class Program(object):
             self.write(pf, line, 1)
             self.write(pf, '')
 
-    def vh_proxy_write(self, pf, scheme='http'):
+    def vh_proxy_write(self, pf):
         machine = self.config['proxy'].get('machine', 'localhost')
         openerp_port = self.config['proxy'].get('openerp_port', 8069)
         longpolling_port = self.config['proxy'].get('longpolling_port', False)
         nokeepalive = self.config['proxy'].get('nokeepalive', True)
-        custom_headers = self.config[scheme].get('custom_headers', [])
+        custom_headers = self.config['proxy'].get('custom_headers', [])
 
         for header in custom_headers:
             self.write(pf, 'RequestHeader set %s "%s"' %
@@ -319,7 +319,7 @@ class Program(object):
             self.vh_http_redirect_to_https_write(pf)
         self.vh_protect_write(pf, 'http')
         if self.config['http']['proxy']:
-            self.vh_proxy_write(pf, 'http')
+            self.vh_proxy_write(pf)
         self.vh_browse_write(pf, 'http')
         self.vh_logs_write(pf)
         self.write(pf, '</VirtualHost>')
@@ -336,7 +336,7 @@ class Program(object):
             self.vh_redirect_unknown_domains_write(pf, 'https')
         self.vh_protect_write(pf, 'https')
         if self.config['https']['proxy']:
-            self.vh_proxy_write(pf, 'https')
+            self.vh_proxy_write(pf)
         self.vh_browse_write(pf, 'https')
         self.vh_logs_write(pf, '-ssl')
         self.write(pf, '</VirtualHost>')

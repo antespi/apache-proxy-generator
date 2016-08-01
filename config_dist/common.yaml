@@ -65,6 +65,11 @@ proxy:
     openerp_port: 8069
     longpolling_port: False
     nokeepalive: True
+    # Custom headers to inyect when proxy is enabled
+    custom_headers: [
+        # ['name', 'value'],
+        # ['X-Odoo-dbfilter', 'odoodb'],
+    ]
 
 # HTTP params
 http:
@@ -82,11 +87,6 @@ http:
     manager_protect: False
     # Protect access to /website/info ('ip' or False)
     webinfo_protect: False
-    # Custom headers to inyect when proxy is enabled
-    custom_headers: [
-        # ['name', 'value'],
-        # ['X-Odoo-dbfilter', 'odoodb'],
-    ]
 
 # HTTPS params
 https:
@@ -102,11 +102,6 @@ https:
     manager_protect: 'certificate'
     # Protect access to /website/info ('ip', 'certificate' or False)
     webinfo_protect: 'certificate'
-    # Custom headers to inyect when proxy is enabled
-    custom_headers: [
-        # ['name', 'value'],
-        # ['X-Odoo-dbfilter', 'odoodb'],
-    ]
 
 # SSL params for these Apache2 directives:
 #   SSLCertificateFile <cert>
