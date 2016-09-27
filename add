@@ -118,17 +118,20 @@ class Program(object):
             self.write(pf, line, 1)
             self.write(pf, '')
 
-    def vh_proxy_write(self, pf):
+    def vh_proxy_write(self, pf, scheme='http'):
         machine = self.config['proxy'].get('machine', 'localhost')
         openerp_port = self.config['proxy'].get('openerp_port', 8069)
         longpolling_port = self.config['proxy'].get('longpolling_port', False)
         nokeepalive = self.config['proxy'].get('nokeepalive', True)
         custom_headers = self.config['proxy'].get('custom_headers', [])
 
+        self.write(pf, 'RequestHeader set X-Forwarded-Proto "%s"' % scheme, 1)
+
         for header in custom_headers:
             self.write(pf, 'RequestHeader set %s "%s"' %
                        (header[0], header[1]), 1)
 
+        self.write(pf, '')
         self.write(pf, '# Comment to disable proxy', 1)
         self.write(pf, 'ProxyRequests Off', 1)
         self.write(pf, 'ProxyPreserveHost On', 1)
@@ -298,8 +301,6 @@ class Program(object):
             self.write(pf, 'SSLCARevocationCheck chain', 1)
             self.write(pf, 'SSLCARevocationFile %s' % crl, 1)
         self.write(pf, '')
-        self.write(pf, 'RequestHeader set X-Forwarded-Proto "https"', 1)
-        self.write(pf, '')
 
     def vh_rewrite_engine_enable(self, pf):
         self.write(pf, '<IfModule mod_rewrite.c>', 1)
@@ -319,7 +320,7 @@ class Program(object):
             self.vh_http_redirect_to_https_write(pf)
         self.vh_protect_write(pf, 'http')
         if self.config['http']['proxy']:
-            self.vh_proxy_write(pf)
+            self.vh_proxy_write(pf, scheme='http')
         self.vh_browse_write(pf, 'http')
         self.vh_logs_write(pf)
         self.write(pf, '</VirtualHost>')
@@ -336,7 +337,7 @@ class Program(object):
             self.vh_redirect_unknown_domains_write(pf, 'https')
         self.vh_protect_write(pf, 'https')
         if self.config['https']['proxy']:
-            self.vh_proxy_write(pf)
+            self.vh_proxy_write(pf, scheme='https')
         self.vh_browse_write(pf, 'https')
         self.vh_logs_write(pf, '-ssl')
         self.write(pf, '</VirtualHost>')
