@@ -269,7 +269,7 @@ class Program(object):
         if self.config.get('web_ips', False):
             web_ips = ' '.join(self.config['web_ips'])
             self.vh_location_write(
-                pf, '^/web(?!/css)(?!/js)(?!/static)([/\?#].*)?$',
+                pf, '^/web(?!/css)(?!/js)(?!/static)(?!/binary)([/\?#].*)?$',
                 web_ips, 'LocationMatch')
             self.vh_location_write(pf, '^/xmlrpc/2/(common|object)',
                                    web_ips, 'LocationMatch')
