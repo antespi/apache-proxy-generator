@@ -153,10 +153,11 @@ class CliBase(object):
         except KeyboardInterrupt:
             verbose.info('Stopped by user')
 
-        except Exception, e:
+        except Exception:
             print(traceback.format_exc())
             if cleanup:
                 cleanup()
+            t, e = sys.exc_info()[:2]
             self.usage(e, errno=255)
 
         if cleanup:
