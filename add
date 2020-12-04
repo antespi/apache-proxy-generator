@@ -394,7 +394,7 @@ class Program(object):
             filepath = os.path.join(self.config['available_path'], filename)
             verbose.show(verbose.INFO,
                          'HTTP virtual host : %s' % filename)
-            with open(filepath, 'wb') as pf:
+            with open(filepath, 'w') as pf:
                 verbose.show(verbose.INFO, 'Creating', 1)
                 self.http_vh_create(pf)
             verbose.show(verbose.INFO, 'Enabling', 1)
@@ -406,7 +406,7 @@ class Program(object):
             filepath = os.path.join(self.config['available_path'], filename)
             verbose.show(verbose.INFO,
                          'HTTPS virtual host : %s' % filename)
-            with open(filepath, 'wb') as pf:
+            with open(filepath, 'w') as pf:
                 verbose.show(verbose.INFO, 'Creating', 1)
                 self.https_vh_create(pf)
             verbose.show(verbose.INFO, 'Enabling', 1)
