@@ -64,11 +64,11 @@ class CliBase(object):
                 aline = lead_space + aline.rstrip()
                 msg.append(aline)
             msg = '\n'.join(msg)
-            print '\n'.join(('', err, msg, errbar, ''))
-            print hline
-        print
+            print('\n'.join(('', err, msg, errbar, '')))
+            print(hline)
+        print("")
         if self.optparser:
-            print self.optparser.format_help()
+            print(self.optparser.format_help())
         sys.exit(errno)
 
     def usage_get(self):
@@ -154,7 +154,7 @@ class CliBase(object):
             verbose.info('Stopped by user')
 
         except Exception, e:
-            print traceback.format_exc()
+            print(traceback.format_exc())
             if cleanup:
                 cleanup()
             self.usage(e, errno=255)

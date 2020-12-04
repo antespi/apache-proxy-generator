@@ -26,7 +26,7 @@ def show(l, msg, indent=0):
         level_str = 'DEBUG : '
     if l >= FULL:
         level_str = 'FULL  : '
-    print level_str + prefix + msg
+    print(level_str + prefix + msg)
 
 
 def enabled(l):
