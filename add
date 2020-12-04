@@ -88,8 +88,12 @@ class Program(object):
     def _stringify(self, value):
         if not value:
             value = ''
-        if type(value) is unicode:
-            value = value.encode('utf-8')
+        try:
+            if type(value) is unicode:
+                value = value.encode('utf-8')
+        except:
+            # This is Python3
+            pass
         if type(value) is float:
             value = str(value).replace('.0', '')
         if not type(value) is str:
