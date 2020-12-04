@@ -10,6 +10,10 @@ import traceback
 import yaml
 import collections
 from optparse import OptionParser
+try:
+    from future.utils import iteritems
+except:
+    pass
 
 from . import verbose
 
@@ -110,7 +114,7 @@ class CliBase(object):
         config = {}
         if os.path.exists(filename):
             f = open(filename)
-            config = yaml.load(f.read())
+            config = yaml.load(f.read(), Loader=yaml.FullLoader)
         else:
             msg = ("ERROR : Config file '%s' does not exist." %
                    filename)
