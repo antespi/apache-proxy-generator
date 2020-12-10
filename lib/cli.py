@@ -114,7 +114,7 @@ class CliBase(object):
         config = {}
         if os.path.exists(filename):
             f = open(filename)
-            config = yaml.load(f.read(), Loader=yaml.FullLoader)
+            config = yaml.load(f.read(), Loader=yaml.SafeLoader)
         else:
             msg = ("ERROR : Config file '%s' does not exist." %
                    filename)
